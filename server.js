@@ -1,9 +1,9 @@
 const express = require('express');
 const app = express();
 const http = require('http');
-const path = require('path'); 
+const path = require('path');
 const { Server } = require('socket.io');
-const ACTIONS=require('./src/Actions')
+const ACTIONS = require('./src/Actions');
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -31,11 +31,14 @@ io.on('connection', socket => {
 
     const clients = getAllConnectedClients(roomId);
 
+    // Use JOINED to notify clients about the new user joining
     io.to(roomId).emit(ACTIONS.JOINED, {
-      clients,
       username,
       socketId: socket.id,
     });
+    
+    // Send the updated client list to everyone using SYNC_CLIENTS
+    io.to(roomId).emit(ACTIONS.SYNC_CLIENTS, { clients });
 
     if (roomCodeMap[roomId]) {
       socket.emit(ACTIONS.CODE_CHANGE, { code: roomCodeMap[roomId] });
@@ -58,12 +61,9 @@ io.on('connection', socket => {
         username,
       });
 
-      // Emit a separate event to update the client list for the remaining users.
-      // This is a more robust way to handle state synchronization.
-      setTimeout(() => {
-        const clients = getAllConnectedClients(roomId);
-        io.to(roomId).emit(ACTIONS.JOINED, { clients });
-      }, 100);
+      // Update the client list for the remaining users
+      const clients = getAllConnectedClients(roomId);
+      io.to(roomId).emit(ACTIONS.SYNC_CLIENTS, { clients });
     });
 
     delete userSocketMap[socket.id];
